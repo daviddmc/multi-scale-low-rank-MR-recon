@@ -39,6 +39,7 @@ for ii=1:nt
 end
 % multicoil NUFFT operator
 E = MCNUFFT(ku,wu,b1);
+kdatau = kdatau* 100;
 
 %[nx,ny,nt,nc]=size(kdata);
 %[E, ET] = EOP(kdata(:,:,:,1) ~= 0, b1);
@@ -48,7 +49,7 @@ Y_size = [nx, ny, nt];
 
 nIter = 64; % Number of iterations
 
-rho = 0.5; % ADMM parameter 0.5
+rho = 1.5; % ADMM parameter 0.5
 skip = 2;
 dorandshift = 1; % Set do random shifts
 
@@ -99,7 +100,7 @@ for it = 1:nIter
     X_it = AT( kdatau - A( Z_it - U_it ) ) + Z_it - U_it;
     
     % Level-wise block threshold
-    parfor l = 1:levels
+    for l = 1:levels
         XU = X_it(:,:,:,l) + U_it(:,:,:,l);
         r = [];
         

@@ -14,7 +14,7 @@ end
 if (max( sum( abs( ZZ ), 1 ) ) < lambda^2)
     
     Z = Z * 0;
-    
+
 else
     
     [U,S,V] = svd( Z, 'econ' );
