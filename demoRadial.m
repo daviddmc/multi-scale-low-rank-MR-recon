@@ -11,10 +11,13 @@ addpath('nufft_toolbox/');
 
 
 % number of spokes to be used per frame (Fibonacci number)
-nspokes=21;
+nspokes=21;%21
 % load radial data
-%load abdomen_dce_ga.mat
+% load abdomen_dce_ga.mat
 load liver_data.mat
+%load simulated_20.mat
+
+%w = dcf;
 [nx, ny, nc] = size(b1);
 [nr,ntviews,nc] = size(kdata);
 
@@ -39,17 +42,15 @@ for ii=1:nt
 end
 % multicoil NUFFT operator
 E = MCNUFFT(ku,wu,b1);
-kdatau = kdatau* 100;
 
-%[nx,ny,nt,nc]=size(kdata);
-%[E, ET] = EOP(kdata(:,:,:,1) ~= 0, b1);
+tmp = E' * kdatau;
+kdatau = kdatau / max(abs(tmp(:)));
 
-%Y_size = size(Y); % Matrix Size
 Y_size = [nx, ny, nt];
 
 nIter = 64; % Number of iterations
 
-rho = 1.5; % ADMM parameter 0.5
+rho = 30; % ADMM parameter 0.5
 skip = 2;
 dorandshift = 1; % Set do random shifts
 
@@ -82,22 +83,73 @@ YD_size = [Y_size,levels];
 decom_dim = length(Y_size) + 1;
 
 % Get summation operator
-A = @(x) E * (sum( x, decom_dim ) / sqrt(levels));
-AT = @(x) repmat( E' * x, [ones(1,decom_dim-1), levels] ) / sqrt(levels);
+A = @(x) (E * (sum( x, decom_dim ))) / sqrt(levels);
+AT = @(x) repmat( E' * x, [ones(1,decom_dim-1), levels] )/ sqrt(levels);
 
 %% Iterations:
 
-X_it = zeros(YD_size);
-Z_it = zeros(YD_size);
-U_it = zeros(YD_size);
+X_it = AT(kdatau);
+%[m, u, flag, iter] = PowerIter( @(x) AT(A(x)), 1e-6, 30, u, 'sym');
+%error('end')
+AX_it = A(X_it);
+Z_it = zeros(size(kdatau));
+U_it = zeros(size(kdatau));
 
 k = 0;
 K = 1;
 rho_k = rho;
+alpha = 100;
 
 for it = 1:nIter
+    X_it = X_it - (1/alpha) * AT(AX_it - Z_it + U_it);
+    
+    for l = 1:levels
+        XU = X_it(:,:,:,l);
+        r = [];
+        
+        if (dorandshift)
+            [XU, r] = randshift( XU );
+        end
+        
+        XU = blockSVT3( XU, block_sizes(l,:), lambdas(l) / rho_k);
+        
+        
+        if (dorandshift)
+            XU = randunshift( XU, r );
+        end
+        
+        X_it(:,:,:,l) = XU;
+    end
+    
+    AX_it = A(X_it);
+    
+    mu = alpha / rho_k;
+    Z_it = (AX_it + U_it + mu * kdatau) / (mu + 1);
+    
+    % Update dual
+    U_it = U_it - Z_it + AX_it;
+    
+    % Update rho
+    k = k + 1;
+    if (k == K)
+        rho_k = rho_k * 2;
+        U_it = U_it / 2;
+        K = K * 2;
+        k = 0;
+    end
+    
+    % Plot
+    figure(24),
+    imshow3(abs(X_it), []),
+    titlef(it);
+    drawnow
+   
+end
+
+%{
+for it = 1:nIter
     % Data consistency
-    X_it = AT( kdatau - A( Z_it - U_it ) ) + Z_it - U_it;
+    X_it = 0.000001 * AT( kdatau - A( Z_it - U_it ) ) + (Z_it - U_it);
     
     % Level-wise block threshold
     for l = 1:levels
@@ -136,6 +188,7 @@ for it = 1:nIter
     titlef(it);
     drawnow
 end
+%}
 
 %% Show Result
 

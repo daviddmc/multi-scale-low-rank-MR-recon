@@ -7,8 +7,8 @@ close all
 setPath
 
 %% Set Parameters
-%load('dce_mri');
 load cardiac_perf_R8.mat;
+%load cardiac_cine_R6
 [nx,ny,nt,nc]=size(kdata);
 [E, ET] = EOP(kdata(:,:,:,1) ~= 0, b1);
 
@@ -68,7 +68,7 @@ for it = 1:nIter
     X_it = AT( kdata - A( Z_it - U_it ) ) + Z_it - U_it;
     
     % Level-wise block threshold
-    parfor l = 1:levels
+    for l = 1:levels
         XU = X_it(:,:,:,l) + U_it(:,:,:,l);
         r = [];
         
